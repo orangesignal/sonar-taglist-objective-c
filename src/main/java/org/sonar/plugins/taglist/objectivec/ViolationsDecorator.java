@@ -51,20 +51,18 @@ public class ViolationsDecorator implements Decorator {
 
 	private static final String OBJC_LANGUAGE_KEY = "objc";
 
-	private static final String TODO_RULE_CONFIG_KEY = "todo comment";
-	private static final String FIXME_RULE_CONFIG_KEY = "fixme comment";
-	private static final String XXX_RULE_CONFIG_KEY = "xxx comment";
-	private static final String NOSONAR_RULE_CONFIG_KEY = "nosonar comment";
+	private static final String TODO_RULE_KEY = "todo comment";
+	private static final String FIXME_RULE_KEY = "fixme comment";
+	private static final String XXX_RULE_KEY = "xxx comment";
+	private static final String NOSONAR_RULE_KEY = "nosonar comment";
 
 	private RulesProfile rulesProfile;
 	private RuleFinder ruleFinder;
-	private MetricFinder metricFinder;
 	private TaglistMetrics taglistMetrics;
 
 	public ViolationsDecorator(RulesProfile rulesProfile, RuleFinder ruleFinder, MetricFinder metricFinder) {
 		this.rulesProfile = rulesProfile;
 		this.ruleFinder = ruleFinder;
-		this.metricFinder = metricFinder;
 		this.taglistMetrics = new TaglistMetrics(metricFinder);
 	}
 
@@ -88,10 +86,10 @@ public class ViolationsDecorator implements Decorator {
 	public void decorate(@SuppressWarnings("rawtypes") Resource resource, DecoratorContext context) {
 		if (Resource.QUALIFIER_FILE.equals(resource.getQualifier())) {
 			final Collection<Rule> rules = new HashSet<Rule>();
-			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withConfigKey(TODO_RULE_CONFIG_KEY)));
-			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withConfigKey(FIXME_RULE_CONFIG_KEY)));
-			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withConfigKey(XXX_RULE_CONFIG_KEY)));
-			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withConfigKey(NOSONAR_RULE_CONFIG_KEY)));
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withKey(TODO_RULE_KEY)));
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withKey(FIXME_RULE_KEY)));
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withKey(XXX_RULE_KEY)));
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withKey(NOSONAR_RULE_KEY)));
 			saveFileMeasures(context, rules);
 		}
 	}
@@ -111,10 +109,10 @@ public class ViolationsDecorator implements Decorator {
 						} else {
 							optional++;
 						}
-						if (NOSONAR_RULE_CONFIG_KEY.equals(rule.getConfigKey())) {
+						if (NOSONAR_RULE_KEY.equals(rule.getKey())) {
 							noSonarTags++;
 						}
-						distrib.add(getTagName(activeRule));
+						distrib.add(getTagName(rule));
 					}
 				}
 			}
@@ -132,15 +130,15 @@ public class ViolationsDecorator implements Decorator {
 		return priority.equals(RulePriority.BLOCKER) || priority.equals(RulePriority.CRITICAL);
 	}
 
-	private String getTagName(final ActiveRule rule) {
-		final String configKey = rule.getConfigKey();
-		if (TODO_RULE_CONFIG_KEY.equals(configKey)) {
+	private String getTagName(final Rule rule) {
+		final String key = rule.getKey();
+		if (TODO_RULE_KEY.equals(key)) {
 			return "TODO";
-		} else if (FIXME_RULE_CONFIG_KEY.equals(configKey)) {
+		} else if (FIXME_RULE_KEY.equals(key)) {
 			return "FIXME";
-		} else if (XXX_RULE_CONFIG_KEY.equals(configKey)) {
+		} else if (XXX_RULE_KEY.equals(key)) {
 			return "XXX";
-		} else if (NOSONAR_RULE_CONFIG_KEY.equals(configKey)) {
+		} else if (NOSONAR_RULE_KEY.equals(key)) {
 			return "NOSONAR";
 		}
 		throw new SonarException("Taglist plugin doesn't work with rule: " + rule);

@@ -60,137 +60,118 @@ import org.sonar.api.measures.MetricFinder;
 import org.sonar.api.measures.CoreMetrics;
 import org.sonar.api.test.IsMeasure;
 
-
 public class ViolationsDecoratorTest {
-    
-  private static final String OBJC_LANGUAGE_KEY = "objc";
 
-  private ViolationsDecorator decorator;
-  private RulesProfile rulesProfile = RulesProfile.create();
-  private Rule rule1, rule2, rule3;
-  private RuleFinder ruleFinder;
-  private MetricFinder metricFinder;
-  private DecoratorContext context;
-  private File javaFile;
-  private TaglistMetrics taglistMetrics;
+	private static final String OBJC_LANGUAGE_KEY = "objc";
 
-  private static final Metric TAGS = new Metric(
-         "tags", "Tags", "Number of tags in the source code",
-         Metric.ValueType.INT, Metric.DIRECTION_WORST, true, CoreMetrics.DOMAIN_RULES);
-  private static final Metric MANDATORY_TAGS = new Metric(
-         "mandatory_tags", "Mandatory tags", "Number of mandatory tags in the source code",
-         Metric.ValueType.INT, Metric.DIRECTION_WORST, true, CoreMetrics.DOMAIN_RULES);
-  private static final Metric OPTIONAL_TAGS = new Metric(
-         "optional_tags", "Optional tags", "Number of optional tags in the source code",
-         Metric.ValueType.INT, Metric.DIRECTION_WORST, true, CoreMetrics.DOMAIN_RULES);
-  private static final Metric TAGS_DISTRIBUTION = new Metric(
-         "tags_distribution", "Tags distribution", "Distribution of tags in the source code",
-         Metric.ValueType.DISTRIB, Metric.DIRECTION_NONE, false, CoreMetrics.DOMAIN_RULES);
-  private static final Metric NOSONAR_TAGS = new Metric(
-         "nosonar_tags", "NOSONAR tags", "Number of NOSONAR tags in the source code",
-         Metric.ValueType.INT, Metric.DIRECTION_WORST, true, CoreMetrics.DOMAIN_RULES);
+	private ViolationsDecorator decorator;
+	private RulesProfile rulesProfile = RulesProfile.create();
+	private Rule todoRule, xxxRule, nosonarRule;
+	private RuleFinder ruleFinder;
+	private MetricFinder metricFinder;
+	private DecoratorContext context;
+	private File javaFile;
+	private TaglistMetrics taglistMetrics;
 
-  @Before
-  public void setUp() {
-    rulesProfile = RulesProfile.create();
-    rule1 = createCodeNarcRule().setKey("key1");
-    rule2 = createCodeNarcRule().setKey("key2");
-    rule3 = createSquidRule();
-    Rule inactiveRule = createCodeNarcRule().setKey("key3");
-    rulesProfile.activateRule(rule1, RulePriority.BLOCKER).setParameter("regex", "FIXME");
-    rulesProfile.activateRule(rule2, RulePriority.MAJOR).setParameter("regex", "TODO");
-    rulesProfile.activateRule(rule3, RulePriority.INFO);
-    
-    ruleFinder = mock(RuleFinder.class);
-    when(ruleFinder.findAll(argThat(any(RuleQuery.class)))).thenReturn(Arrays.asList(rule1, rule2, inactiveRule, rule3));
-    
-    metricFinder = mock(MetricFinder.class);
-    when(metricFinder.findByKey(eq("tags"))).thenReturn(TAGS);
-    when(metricFinder.findByKey(eq("optional_tags"))).thenReturn(OPTIONAL_TAGS);
-    when(metricFinder.findByKey(eq("mandatory_tags"))).thenReturn(MANDATORY_TAGS);
-    when(metricFinder.findByKey(eq("nosonar_tags"))).thenReturn(NOSONAR_TAGS);
-    when(metricFinder.findByKey(eq("tags_distribution"))).thenReturn(TAGS_DISTRIBUTION);
+	private static final Metric TAGS = new Metric("tags", "Tags", "Number of tags in the source code", Metric.ValueType.INT, Metric.DIRECTION_WORST, true, CoreMetrics.DOMAIN_RULES);
+	private static final Metric MANDATORY_TAGS = new Metric("mandatory_tags", "Mandatory tags", "Number of mandatory tags in the source code", Metric.ValueType.INT, Metric.DIRECTION_WORST, true, CoreMetrics.DOMAIN_RULES);
+	private static final Metric OPTIONAL_TAGS = new Metric("optional_tags", "Optional tags", "Number of optional tags in the source code", Metric.ValueType.INT, Metric.DIRECTION_WORST, true, CoreMetrics.DOMAIN_RULES);
+	private static final Metric TAGS_DISTRIBUTION = new Metric("tags_distribution", "Tags distribution", "Distribution of tags in the source code", Metric.ValueType.DISTRIB, Metric.DIRECTION_NONE, false, CoreMetrics.DOMAIN_RULES);
+	private static final Metric NOSONAR_TAGS = new Metric("nosonar_tags", "NOSONAR tags", "Number of NOSONAR tags in the source code", Metric.ValueType.INT, Metric.DIRECTION_WORST, true, CoreMetrics.DOMAIN_RULES);
 
-    context = mock(DecoratorContext.class);
-    javaFile = new File("org.example", "HelloWorld");
+	@Before
+	public void setUp() {
+		rulesProfile = RulesProfile.create();
+		todoRule = createRule().setKey("todo comment");
+		xxxRule = createRule().setKey("xxx comment");
+		nosonarRule = createRule().setKey("nosonar comment");
+		Rule inactiveRule = createRule().setKey("fixme comment");
+		rulesProfile.activateRule(todoRule, RulePriority.CRITICAL);
+		rulesProfile.activateRule(xxxRule, RulePriority.MINOR);
+		rulesProfile.activateRule(nosonarRule, RulePriority.INFO);
 
-    taglistMetrics = new TaglistMetrics(metricFinder);
-    decorator = new ViolationsDecorator(rulesProfile, ruleFinder, metricFinder);
-  }
+		ruleFinder = mock(RuleFinder.class);
+		when(ruleFinder.findAll(argThat(any(RuleQuery.class)))).thenReturn(Arrays.asList(todoRule, xxxRule, inactiveRule, nosonarRule));
 
-  @Test
-  public void dependedUpon() {
-    assertThat(decorator.dependedUpon().size(), is(5));
-  }
+		metricFinder = mock(MetricFinder.class);
+		when(metricFinder.findByKey(eq("tags"))).thenReturn(TAGS);
+		when(metricFinder.findByKey(eq("optional_tags"))).thenReturn(OPTIONAL_TAGS);
+		when(metricFinder.findByKey(eq("mandatory_tags"))).thenReturn(MANDATORY_TAGS);
+		when(metricFinder.findByKey(eq("nosonar_tags"))).thenReturn(NOSONAR_TAGS);
+		when(metricFinder.findByKey(eq("tags_distribution"))).thenReturn(TAGS_DISTRIBUTION);
 
-  @Test
-  public void shouldExecuteOnlyOnObjectiveCProject() {
-    Project project = mock(Project.class);
-    when(project.getLanguageKey()).thenReturn(OBJC_LANGUAGE_KEY).thenReturn("java");
+		context = mock(DecoratorContext.class);
+		javaFile = new File("org.example", "HelloWorld");
 
-    assertThat(decorator.shouldExecuteOnProject(project), is(true));
-    assertThat(decorator.shouldExecuteOnProject(project), is(false));
-  }
+		taglistMetrics = new TaglistMetrics(metricFinder);
+		decorator = new ViolationsDecorator(rulesProfile, ruleFinder,metricFinder);
+	}
 
-  @Test
-  public void dontDecoratePackage() {
-    Resource resource = mock(Resource.class);
-    when(resource.getQualifier()).thenReturn(Resource.QUALIFIER_PACKAGE);
-    ViolationsDecorator spy = spy(decorator);
+	private static Rule createRule() {
+		final Rule rule = Rule.create();
+		rule.setRepositoryKey(OBJC_LANGUAGE_KEY);
+		return rule;
+	}
 
-    spy.decorate(resource, context);
+	@Test
+	public void dependedUpon() {
+		assertThat(decorator.dependedUpon().size(), is(5));
+	}
 
-    verify(spy, never()).saveFileMeasures(eq(context), argThat(any(Collection.class)));
-  }
+	@Test
+	public void shouldExecuteOnlyOnObjectiveCProject() {
+		final Project project = mock(Project.class);
+		when(project.getLanguageKey()).thenReturn(OBJC_LANGUAGE_KEY).thenReturn("java");
+		assertThat(decorator.shouldExecuteOnProject(project), is(true));
+		assertThat(decorator.shouldExecuteOnProject(project), is(false));
+	}
 
-  @Test
-  public void shouldSaveMetrics() {
-    Violation mandatory = Violation.create(rule1, null);
-    Violation optional = Violation.create(rule2, null);
-    Violation info = Violation.create(rule3, null);
-    when(context.getViolations()).thenReturn(Arrays.asList(mandatory, optional, info));
+	@Test
+	public void dontDecoratePackage() {
+		final Resource resource = mock(Resource.class);
+		when(resource.getQualifier()).thenReturn(Resource.QUALIFIER_PACKAGE);
+		ViolationsDecorator spy = spy(decorator);
 
-    decorator.decorate(javaFile, context);
+		spy.decorate(resource, context);
 
-    verify(context, atLeastOnce()).getViolations();
-    verify(context).saveMeasure(eq(taglistMetrics.getTags()), doubleThat(equalTo(3.0)));
-    verify(context).saveMeasure(eq(taglistMetrics.getMandatoryTags()), doubleThat(equalTo(1.0)));
-    verify(context).saveMeasure(eq(taglistMetrics.getOptionalTags()), doubleThat(equalTo(2.0)));
-    verify(context).saveMeasure(eq(taglistMetrics.getNosonarTags()), doubleThat(equalTo(1.0)));
-    verify(context).saveMeasure(argThat(new IsMeasure(taglistMetrics.getTagsDistribution(), "FIXME=1;NOSONAR=1;TODO=1")));
-    verifyNoMoreInteractions(context);
-  }
+		verify(spy, never()).saveFileMeasures(eq(context), argThat(any(Collection.class)));
+	}
 
-  @Test
-  public void shouldntSaveMetricsIfNoTags() {
-    when(context.getViolations()).thenReturn(Collections.<Violation> emptyList());
+	@Test
+	public void shouldSaveMetrics() {
+		final Violation mandatory = Violation.create(todoRule, null);
+		final Violation optional = Violation.create(xxxRule, null);
+		final Violation info = Violation.create(nosonarRule, null);
+		when(context.getViolations()).thenReturn(Arrays.asList(mandatory, optional, info));
 
-    decorator.decorate(javaFile, context);
+		decorator.decorate(javaFile, context);
 
-    verify(context, atLeastOnce()).getViolations();
-    verifyNoMoreInteractions(context);
-  }
+		verify(context, atLeastOnce()).getViolations();
+		verify(context).saveMeasure(eq(taglistMetrics.getTags()), doubleThat(equalTo(3.0)));
+		verify(context).saveMeasure(eq(taglistMetrics.getMandatoryTags()), doubleThat(equalTo(1.0)));
+		verify(context).saveMeasure(eq(taglistMetrics.getOptionalTags()), doubleThat(equalTo(2.0)));
+		verify(context).saveMeasure(eq(taglistMetrics.getNosonarTags()), doubleThat(equalTo(1.0)));
+		verify(context).saveMeasure(argThat(new IsMeasure(taglistMetrics.getTagsDistribution(), "NOSONAR=1;TODO=1;XXX=1")));
+		verifyNoMoreInteractions(context);
+	}
 
-  @Test
-  public void rulePriorities() {
-    assertThat(ViolationsDecorator.isMandatory(RulePriority.BLOCKER), is(true));
-    assertThat(ViolationsDecorator.isMandatory(RulePriority.CRITICAL), is(true));
-    assertThat(ViolationsDecorator.isMandatory(RulePriority.MAJOR), is(false));
-    assertThat(ViolationsDecorator.isMandatory(RulePriority.MINOR), is(false));
-    assertThat(ViolationsDecorator.isMandatory(RulePriority.INFO), is(false));
-  }
+	@Test
+	public void shouldntSaveMetricsIfNoTags() {
+		when(context.getViolations()).thenReturn(Collections.<Violation> emptyList());
 
-  private Rule createSquidRule() {
-    Rule rule = Rule.create();
-    rule.setRepositoryKey(CoreProperties.SQUID_PLUGIN);
-    return rule;
-  }
+		decorator.decorate(javaFile, context);
 
-  private Rule createCodeNarcRule() {
-    Rule rule = Rule.create();
-    rule.setRepositoryKey(OBJC_LANGUAGE_KEY);
-    rule.createParameter("regex").setDefaultValue("TODO:");
-    return rule;
-  }
+		verify(context, atLeastOnce()).getViolations();
+		verifyNoMoreInteractions(context);
+	}
+
+	@Test
+	public void rulePriorities() {
+		assertThat(ViolationsDecorator.isMandatory(RulePriority.BLOCKER), is(true));
+		assertThat(ViolationsDecorator.isMandatory(RulePriority.CRITICAL), is(true));
+		assertThat(ViolationsDecorator.isMandatory(RulePriority.MAJOR), is(false));
+		assertThat(ViolationsDecorator.isMandatory(RulePriority.MINOR), is(false));
+		assertThat(ViolationsDecorator.isMandatory(RulePriority.INFO), is(false));
+	}
 
 }
