@@ -62,7 +62,7 @@ import org.sonar.api.test.IsMeasure;
 
 public class ViolationsDecoratorTest {
 
-	private static final String OBJC_LANGUAGE_KEY = "objc";
+	private static final String OCLINT_REPOSITORY_KEY = "OCLint";
 
 	private ViolationsDecorator decorator;
 	private RulesProfile rulesProfile = RulesProfile.create();
@@ -109,7 +109,7 @@ public class ViolationsDecoratorTest {
 
 	private static Rule createRule() {
 		final Rule rule = Rule.create();
-		rule.setRepositoryKey(OBJC_LANGUAGE_KEY);
+		rule.setRepositoryKey(OCLINT_REPOSITORY_KEY);
 		return rule;
 	}
 
@@ -121,7 +121,7 @@ public class ViolationsDecoratorTest {
 	@Test
 	public void shouldExecuteOnlyOnObjectiveCProject() {
 		final Project project = mock(Project.class);
-		when(project.getLanguageKey()).thenReturn(OBJC_LANGUAGE_KEY).thenReturn("java");
+		when(project.getLanguageKey()).thenReturn("objc").thenReturn("java");
 		assertThat(decorator.shouldExecuteOnProject(project), is(true));
 		assertThat(decorator.shouldExecuteOnProject(project), is(false));
 	}

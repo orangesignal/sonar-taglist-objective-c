@@ -50,6 +50,7 @@ import org.sonar.api.utils.SonarException;
 public class ViolationsDecorator implements Decorator {
 
 	private static final String OBJC_LANGUAGE_KEY = "objc";
+	private static final String OCLINT_REPOSITORY_KEY = "OCLint";
 
 	private static final String TODO_RULE_KEY = "todo comment";
 	private static final String FIXME_RULE_KEY = "fixme comment";
@@ -86,10 +87,10 @@ public class ViolationsDecorator implements Decorator {
 	public void decorate(@SuppressWarnings("rawtypes") Resource resource, DecoratorContext context) {
 		if (Resource.QUALIFIER_FILE.equals(resource.getQualifier())) {
 			final Collection<Rule> rules = new HashSet<Rule>();
-			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withKey(TODO_RULE_KEY)));
-			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withKey(FIXME_RULE_KEY)));
-			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withKey(XXX_RULE_KEY)));
-			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withKey(NOSONAR_RULE_KEY)));
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OCLINT_REPOSITORY_KEY).withKey(TODO_RULE_KEY)));
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OCLINT_REPOSITORY_KEY).withKey(FIXME_RULE_KEY)));
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OCLINT_REPOSITORY_KEY).withKey(XXX_RULE_KEY)));
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OCLINT_REPOSITORY_KEY).withKey(NOSONAR_RULE_KEY)));
 			saveFileMeasures(context, rules);
 		}
 	}
