@@ -49,9 +49,12 @@ import org.sonar.api.utils.SonarException;
 @DependsUpon(DecoratorBarriers.END_OF_VIOLATIONS_GENERATION)
 public class ViolationsDecorator implements Decorator {
 
-	private static final String OBJC_RULE_CONFIG_KEY = "todo comment";
 	private static final String OBJC_LANGUAGE_KEY = "objc";
-//	private static final String NOSONAR_RULE_CONFIG_KEY = "NoSonar";
+
+	private static final String TODO_RULE_CONFIG_KEY = "todo comment";
+	private static final String FIXME_RULE_CONFIG_KEY = "fixme comment";
+	private static final String XXX_RULE_CONFIG_KEY = "xxx comment";
+	private static final String NOSONAR_RULE_CONFIG_KEY = "nosonar comment";
 
 	private RulesProfile rulesProfile;
 	private RuleFinder ruleFinder;
@@ -83,74 +86,75 @@ public class ViolationsDecorator implements Decorator {
 
 	@Override
 	public void decorate(@SuppressWarnings("rawtypes") Resource resource, DecoratorContext context) {
-		if (Resource.QUALIFIER_FILE.equals(resource.getQualifier())) {Collection<Rule> rules = new HashSet<Rule>();
+		if (Resource.QUALIFIER_FILE.equals(resource.getQualifier())) {
+			final Collection<Rule> rules = new HashSet<Rule>();
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withConfigKey(TODO_RULE_CONFIG_KEY)));
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withConfigKey(FIXME_RULE_CONFIG_KEY)));
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withConfigKey(XXX_RULE_CONFIG_KEY)));
+			rules.addAll(ruleFinder.findAll(RuleQuery.create().withRepositoryKey(OBJC_LANGUAGE_KEY).withConfigKey(NOSONAR_RULE_CONFIG_KEY)));
+			saveFileMeasures(context, rules);
+		}
+	}
 
-      RuleQuery ruleQuery = RuleQuery.create()
-          .withRepositoryKey(OBJC_LANGUAGE_KEY)
-          .withConfigKey(OBJC_RULE_CONFIG_KEY);
-      rules.addAll(ruleFinder.findAll(ruleQuery));
-//      ruleQuery = RuleQuery.create()
-//          .withRepositoryKey(CoreProperties.SQUID_PLUGIN)
-//          .withKey(NOSONAR_RULE_CONFIG_KEY);
-//      rules.addAll(ruleFinder.findAll(ruleQuery));
+	protected void saveFileMeasures(final DecoratorContext context, final Collection<Rule> rules) {
+		final CountDistributionBuilder distrib = new CountDistributionBuilder(taglistMetrics.getTagsDistribution());
+		int mandatory = 0;
+		int optional = 0;
+		int noSonarTags = 0;
+		for (final Rule rule : rules) {
+			final ActiveRule activeRule = rulesProfile.getActiveRule(rule);
+			if (activeRule != null) {
+				for (final Violation violation : context.getViolations()) {
+					if (violation.getRule().equals(rule)) {
+						if (isMandatory(activeRule.getSeverity())) {
+							mandatory++;
+						} else {
+							optional++;
+						}
+						if (NOSONAR_RULE_CONFIG_KEY.equals(rule.getConfigKey())) {
+							noSonarTags++;
+						}
+						distrib.add(getTagName(activeRule));
+					}
+				}
+			}
+		}
+		saveMeasure(context, taglistMetrics.getTags(), mandatory + optional);
+		saveMeasure(context, taglistMetrics.getMandatoryTags(), mandatory);
+		saveMeasure(context, taglistMetrics.getOptionalTags(), optional);
+		saveMeasure(context, taglistMetrics.getNosonarTags(), noSonarTags);
+		if (!distrib.isEmpty()) {
+			context.saveMeasure(distrib.build().setPersistenceMode(PersistenceMode.MEMORY));
+		}
+	}
 
-      saveFileMeasures(context, rules);
-    }
-  }
+	protected static boolean isMandatory(final RulePriority priority) {
+		return priority.equals(RulePriority.BLOCKER) || priority.equals(RulePriority.CRITICAL);
+	}
 
-  protected void saveFileMeasures(DecoratorContext context, Collection<Rule> rules) {
-    CountDistributionBuilder distrib = new CountDistributionBuilder(taglistMetrics.getTagsDistribution());
-    int mandatory = 0;
-    int optional = 0;
-    int noSonarTags = 0;
-    for (Rule rule : rules) {
-      ActiveRule activeRule = rulesProfile.getActiveRule(rule);
-      if (activeRule != null) {
-        for (Violation violation : context.getViolations()) {
-          if (violation.getRule().equals(rule)) {
-            if (isMandatory(activeRule.getSeverity())) {
-              mandatory++;
-            } else {
-              optional++;
-            }
-            if (CoreProperties.SQUID_PLUGIN.equals(rule.getRepositoryKey())) {
-              noSonarTags++;
-            }
-            distrib.add(getTagName(activeRule));
-          }
-        }
-      }
-    }
-    saveMeasure(context, taglistMetrics.getTags(), mandatory + optional);
-    saveMeasure(context, taglistMetrics.getMandatoryTags(), mandatory);
-    saveMeasure(context, taglistMetrics.getOptionalTags(), optional);
-    saveMeasure(context, taglistMetrics.getNosonarTags(), noSonarTags);
-    if (!distrib.isEmpty()) {
-      context.saveMeasure(distrib.build().setPersistenceMode(PersistenceMode.MEMORY));
-    }
-  }
+	private String getTagName(final ActiveRule rule) {
+		final String configKey = rule.getConfigKey();
+		if (TODO_RULE_CONFIG_KEY.equals(configKey)) {
+			return "TODO";
+		} else if (FIXME_RULE_CONFIG_KEY.equals(configKey)) {
+			return "FIXME";
+		} else if (XXX_RULE_CONFIG_KEY.equals(configKey)) {
+			return "XXX";
+		} else if (NOSONAR_RULE_CONFIG_KEY.equals(configKey)) {
+			return "NOSONAR";
+		}
+		throw new SonarException("Taglist plugin doesn't work with rule: " + rule);
+	}
 
-  protected static boolean isMandatory(RulePriority priority) {
-    return priority.equals(RulePriority.BLOCKER) || priority.equals(RulePriority.CRITICAL);
-  }
+	private void saveMeasure(final DecoratorContext context, final Metric metric, final int value) {
+		if (value > 0) {
+			context.saveMeasure(metric, (double) value);
+		}
+	}
 
-  private String getTagName(ActiveRule rule) {
-    if (OBJC_LANGUAGE_KEY.equals(rule.getRepositoryKey())) {
-      return rule.getParameter("regex");
-    } else if (CoreProperties.SQUID_PLUGIN.equals(rule.getRepositoryKey())) {
-      return "NOSONAR";
-    }
-    throw new SonarException("Taglist plugin doesn't work with rule: " + rule);
-  }
+	@Override
+	public String toString() {
+		return "Objective-C Taglist Decorator";
+	}
 
-  private void saveMeasure(DecoratorContext context, Metric metric, int value) {
-    if (value > 0) {
-      context.saveMeasure(metric, (double) value);
-    }
-  }
-
-  @Override
-  public String toString() {
-    return "Objective-C Taglist Decorator";
-  }
 }
